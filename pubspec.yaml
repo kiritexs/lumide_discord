@@ -8,6 +8,7 @@ issue_tracker: https://github.com/kiritexs/lumide_discord/issues
 
 topics:
   - lumide-plugin
+  - lumide-utils
   - discord
 
 executables:
