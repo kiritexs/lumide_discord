@@ -1,0 +1,91 @@
+id: lumide_discord
+name: 'Discord Presence'
+version: '0.1.0'
+description: "Show what you're working on in your Discord status: file, project, language and time."
+license: 'GPL-3.0'
+entry_point: 'bin/main.dart'
+
+activation_events:
+  - 'onStartup'
+
+# Lumide shows these so you can see what the plugin reads. The plugin only
+# reads pubspec.yaml files, to show Flutter instead of Dart in Flutter
+# projects. It also talks to the Discord app on this computer, which Lumide's
+# permissions don't cover; see "Privacy and permissions" in the README.
+permissions:
+  - fileSystem:
+      - '${workspace}/**/pubspec.yaml'
+
+configuration:
+  - key: discordPresence.enabled
+    type: boolean
+    default: true
+    title: 'Show on Discord'
+    description: "Show what you're working on in your Discord status."
+  - key: discordPresence.privacyMode
+    type: boolean
+    default: false
+    title: 'Privacy Mode'
+    description: 'Hide file and project names, for example while screen sharing or on client work: "Editing a Dart file". The language, idle and debugging are still shown.'
+  - key: discordPresence.showButtons
+    type: boolean
+    default: true
+    title: 'Show Buttons'
+    description: 'Show "Get Lumide" (lumide.dev) and "Join Lumide Discord" buttons under your status. Others can click them; Discord doesn''t let you click your own.'
+  - key: discordPresence.customButtonLabel
+    type: string
+    default: ''
+    title: 'Custom Button Text'
+    description: 'Text of your own button, in place of "Join Lumide Discord", e.g. "View on GitHub". Up to 32 characters; needs Custom Button Link too.'
+  - key: discordPresence.customButtonUrl
+    type: string
+    default: ''
+    title: 'Custom Button Link'
+    description: 'The web address your button opens, starting with https://.'
+  - key: discordPresence.applicationId
+    type: string
+    default: ''
+    title: 'Discord Application ID'
+    description: 'Leave empty to show "Playing Lumide". To show another name or your own images, create an application at discord.com/developers and paste its ID.'
+  - key: discordPresence.showFileName
+    type: boolean
+    default: true
+    title: 'Show File Name'
+    description: 'Show the open file''s name. When off, only its language is shown ("Editing a Dart file").'
+  - key: discordPresence.showProjectName
+    type: boolean
+    default: true
+    title: 'Show Project Name'
+    description: 'Show the name of the workspace folder you''re working in.'
+  - key: discordPresence.showLanguage
+    type: boolean
+    default: true
+    title: 'Show Language'
+    description: 'Show the language icon and name of the open file.'
+  - key: discordPresence.showElapsedTime
+    type: boolean
+    default: true
+    title: 'Show Elapsed Time'
+    description: 'Show how long Lumide has been open.'
+  - key: discordPresence.idleMinutes
+    type: integer
+    default: 5
+    title: 'Idle After (Minutes)'
+    description: 'Show "Idle" after this many minutes without typing, moving the cursor or switching files. 0 never goes idle.'
+  - key: discordPresence.clearWhenIdle
+    type: boolean
+    default: false
+    title: 'Hide When Idle'
+    description: 'Remove your status while idle instead of showing "Idle".'
+
+contributes:
+  commands:
+    - id: discordPresence.toggle
+      title: 'Discord Presence: Turn On/Off'
+      category: 'Discord Presence'
+    - id: discordPresence.togglePrivacy
+      title: 'Discord Presence: Turn Privacy Mode On/Off'
+      category: 'Discord Presence'
+    - id: discordPresence.reconnect
+      title: 'Discord Presence: Reconnect'
+      category: 'Discord Presence'
