@@ -3,12 +3,15 @@ library;
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:lumide_api/lumide_api.dart';
 import 'package:path/path.dart' as p;
 
 import 'activity.dart';
 import 'discord_link.dart';
+import 'menu.dart';
+import 'projects.dart';
 import 'settings.dart';
 
 class DiscordPresencePlugin extends LumidePlugin {
@@ -16,6 +19,7 @@ class DiscordPresencePlugin extends LumidePlugin {
       : _createLink = link;
 
   static const _statusItem = 'discord';
+  static const menuCommand = 'discordPresence.menu';
   static const toggleCommand = 'discordPresence.toggle';
   static const reconnectCommand = 'discordPresence.reconnect';
   static const privacyCommand = 'discordPresence.togglePrivacy';
@@ -28,6 +32,9 @@ class DiscordPresencePlugin extends LumidePlugin {
   final _subscriptions = <LumideDisposable>[];
   Timer? _idleTimer;
 
+  /// The Discord icon for the status bar; `null` shows text instead.
+  String? _iconPath;
+
   PresenceSettings _settings = const PresenceSettings();
   final DateTime _sessionStart = DateTime.now();
   DateTime _lastActivity = DateTime.now();
@@ -35,6 +42,7 @@ class DiscordPresencePlugin extends LumidePlugin {
   String? _filePath;
   bool _editing = false;
   String? _projectName;
+  String? _projectPath;
   bool _flutterProject = false;
   final _flutterByFolder = <String, bool>{};
 
@@ -50,17 +58,26 @@ class DiscordPresencePlugin extends LumidePlugin {
     _linkOrNull = _createLink?.call(this) ??
         DiscordLink(log: log, onStateChanged: (_) => _updateStatusBar());
 
+    _iconPath = await _findIcon();
     await context.statusBar.createItem(
       id: _statusItem,
-      text: 'Discord',
-      command: toggleCommand,
+      text: _iconPath == null ? 'Discord' : '',
+      tooltip: 'Discord Presence',
+      command: menuCommand,
+      iconPath: _iconPath,
       alignment: 'right',
+    );
+    await context.commands.registerCommand(
+      id: menuCommand,
+      title: 'Discord Presence: Show Menu',
+      category: 'Discord Presence',
+      callback: ([args]) => _guard(() => _showMenu(args)),
     );
     await context.commands.registerCommand(
       id: toggleCommand,
       title: 'Discord Presence: Turn On/Off',
       category: 'Discord Presence',
-      callback: ([_]) => _toggle(),
+      callback: ([_]) => _flip(MenuAction.toggle),
     );
     await context.commands.registerCommand(
       id: reconnectCommand,
@@ -72,7 +89,7 @@ class DiscordPresencePlugin extends LumidePlugin {
       id: privacyCommand,
       title: 'Discord Presence: Turn Privacy Mode On/Off',
       category: 'Discord Presence',
-      callback: ([_]) => _togglePrivacy(),
+      callback: ([_]) => _flip(MenuAction.privacyMode),
     );
 
     _subscriptions
@@ -127,6 +144,8 @@ class DiscordPresencePlugin extends LumidePlugin {
     };
     final previous = _settings;
     _settings = PresenceSettings.fromValues(values);
+    _projectFilter = _settings.projectFilter;
+    _updateExcluded();
 
     if (!_settings.enabled) {
       await _link.stop();
@@ -138,16 +157,139 @@ class DiscordPresencePlugin extends LumidePlugin {
     await _updateStatusBar();
   }
 
-  Future<void> _toggle() async {
-    await _context.workspace
-        .updateConfiguration(PresenceSettings.enabledKey, !_settings.enabled);
+  /// Turns the on/off setting behind [action] around.
+  Future<void> _flip(MenuAction action) async {
+    final setting = settingOf(action, _settings);
+    if (setting == null) return;
+    await _context.workspace.updateConfiguration(setting.$1, !setting.$2);
     await _reloadSettings();
   }
 
-  Future<void> _togglePrivacy() async {
+  /// The menu from the status bar icon, opened where it was clicked.
+  Future<void> _showMenu(Map<String, dynamic>? args) async {
+    final position = _positionOf(args);
+    final selected = await _context.window.showQuickPick(
+      menuItems(
+        settings: _settings,
+        linkState: _link.state,
+        projectName: _projectName,
+        projectState: _projectState,
+      ),
+      placeholder: 'Discord Presence',
+      position: position,
+    );
+    final action = MenuAction.values.asNameMap()[_payloadOf(selected)];
+    switch (action) {
+      case null:
+        return;
+      case MenuAction.reconnect:
+        await _link.reconnectNow();
+      case MenuAction.project:
+        await _toggleProject();
+      case MenuAction.excludedProjects:
+        await _editProjects(
+          PresenceSettings.excludedProjectsKey,
+          () => _settings.excludedProjects,
+          'Excluded Projects',
+          position,
+        );
+      case MenuAction.includedProjects:
+        await _editProjects(
+          PresenceSettings.includedProjectsKey,
+          () => _settings.includedProjects,
+          'Included Projects',
+          position,
+        );
+      default:
+        await _flip(action);
+    }
+  }
+
+  /// Lumide answers a quick pick with the picked payload; older hosts with
+  /// the whole item.
+  static Object? _payloadOf(QuickPickItem? selected) =>
+      switch (selected?.payload) {
+        final Map item => item['payload'],
+        final other => other,
+      };
+
+  /// The menu for a project list ([key]): add folders with the folder
+  /// picker or patterns by typing, or remove entries. It opens again after
+  /// each change, until dismissed.
+  Future<void> _editProjects(String key, List<String> Function() entries,
+      String title, Map<String, int>? position) async {
+    while (!_deactivated) {
+      final current = entries();
+      final selected = await _context.window.showQuickPick(
+        projectListItems(current),
+        placeholder: title,
+        position: position,
+      );
+      final List<String> updated;
+      switch (ListAction.of(_payloadOf(selected))) {
+        case null:
+          return;
+        case AddFolder():
+          final folder = await _context.window.showOpenFolderDialog(
+            title: '$title: Add Folder',
+            defaultPath: _projectPath == null ? null : p.dirname(_projectPath!),
+          );
+          if (folder == null || folder.isEmpty) continue;
+          updated = addEntry(current, folder);
+        case AddPattern():
+          final pattern = await _context.window.showInputBox(
+            title: '$title: Add Pattern',
+            prompt: 'A folder path, a glob or a project name',
+            placeHolder: r'D:/work/**   **/clients/*   company_app',
+          );
+          if (pattern == null) continue;
+          updated = addEntry(current, pattern);
+        case RemoveEntry(:final index):
+          if (index < 0 || index >= current.length) continue;
+          updated = [...current]..removeAt(index);
+      }
+      if (!identical(updated, current)) {
+        await _context.workspace.updateConfiguration(key, joinList(updated));
+        await _reloadSettings();
+      }
+    }
+  }
+
+  ProjectState get _projectState {
+    if (!_isExcluded) return ProjectState.shown;
+    final path = _projectPath;
+    final byMenu = path != null &&
+        _settings.excludedProjects
+            .any((entry) => ProjectPattern(entry).isFolder(path));
+    return byMenu ? ProjectState.hiddenByMenu : ProjectState.hiddenBySettings;
+  }
+
+  /// Adds the current project's folder to the exclude list, or removes it.
+  Future<void> _toggleProject() async {
+    final path = _projectPath;
+    if (path == null) return;
+    final entries = [..._settings.excludedProjects];
+    final before = entries.length;
+    entries.removeWhere((entry) => ProjectPattern(entry).isFolder(path));
+    if (entries.length == before) entries.add(path);
     await _context.workspace.updateConfiguration(
-        PresenceSettings.privacyModeKey, !_settings.privacyMode);
+        PresenceSettings.excludedProjectsKey, joinList(entries));
     await _reloadSettings();
+  }
+
+  /// The exclude and include lists, parsed once per settings change.
+  ProjectFilter _projectFilter = ProjectFilter();
+
+  /// Whether the current project is excluded. It only changes with the open
+  /// file or the settings, so it is worked out then, not on every keystroke.
+  bool _isExcluded = false;
+
+  void _updateExcluded() {
+    _isExcluded = _projectFilter.isExcluded(
+      projectPath: _projectPath,
+      projectName: _projectName,
+      filePath: _filePath,
+    );
   }
 
   static String _launchId(LumideLaunchEvent event) =>
@@ -168,8 +310,11 @@ class DiscordPresencePlugin extends LumidePlugin {
     final path = _pathOf(uri);
     if (path != _filePath) _editing = false;
     _filePath = path;
+    final wasExcluded = _isExcluded;
     if (uri != null) await _loadProject(uri);
+    _updateExcluded();
     _onActivity();
+    if (_isExcluded != wasExcluded) await _updateStatusBar();
   }
 
   /// The workspace folder holding [uri], and whether it is a Flutter
@@ -178,8 +323,9 @@ class DiscordPresencePlugin extends LumidePlugin {
     final folder = await _context.workspace.getWorkspaceFolder(uri);
     if (folder == null) return;
     _projectName = folder.name;
+    _projectPath = _pathOf(folder.uri);
     _flutterProject = _flutterByFolder[folder.uri] ??=
-        await _isFlutterProject(_pathOf(folder.uri));
+        await _isFlutterProject(_projectPath);
   }
 
   Future<bool> _isFlutterProject(String? folder) async {
@@ -219,6 +365,7 @@ class DiscordPresencePlugin extends LumidePlugin {
         flutterProject: _flutterProject,
         idle: _idle,
         runMode: _runMode,
+        excluded: _isExcluded,
       ),
       _settings,
     ));
@@ -226,21 +373,22 @@ class DiscordPresencePlugin extends LumidePlugin {
 
   Future<void> _updateStatusBar() async {
     if (_deactivated) return;
-    final (text, tooltip, color) = switch (_link.state) {
+    final hidden = _settings.privacyMode
+        ? ' Privacy mode: file and project names are hidden.'
+        : _isExcluded
+            ? _settings.hideExcludedProjects
+                ? ' This project is hidden from Discord.'
+                : ' File and project names of this project are hidden.'
+            : '';
+    final (label, tooltip, color) = switch (_link.state) {
       _ when !_settings.enabled => (
           'Discord: off',
-          'Discord Presence is off. Click to turn it on.',
+          'Discord Presence is off.',
           '#8A8A8A',
         ),
-      LinkState.connected when _settings.privacyMode => (
-          'Discord: private',
-          'Showing your activity on Discord without file and project '
-              'names (privacy mode). Click to turn it off.',
-          '#5865F2',
-        ),
       LinkState.connected => (
-          'Discord',
-          'Showing your activity on Discord. Click to turn it off.',
+          _settings.privacyMode ? 'Discord: private' : 'Discord',
+          'Showing your activity on Discord.$hidden',
           '#5865F2',
         ),
       LinkState.connecting => (
@@ -251,12 +399,48 @@ class DiscordPresencePlugin extends LumidePlugin {
       LinkState.waiting || LinkState.off => (
           'Discord: waiting',
           'Discord isn\'t running. Retrying every '
-              '${_link.retryDelay.inSeconds} s. Click to turn it off.',
+              '${_link.retryDelay.inSeconds} s.',
           '#8A8A8A',
         ),
     };
-    await _guard(() => _context.statusBar
-        .updateItem(_statusItem, text: text, tooltip: tooltip, color: color));
+    await _guard(() => _context.statusBar.updateItem(
+          _statusItem,
+          text: _iconPath == null ? label : '',
+          tooltip: '$tooltip Click for options.',
+          color: color,
+        ));
+  }
+
+  /// The Discord icon shipped with the plugin, wherever it is installed.
+  static Future<String?> _findIcon() async {
+    const asset = 'assets/icon_discord.svg';
+    final candidates = <String>[];
+    try {
+      final library = await Isolate.resolvePackageUri(
+          Uri.parse('package:lumide_discord/lumide_discord.dart'));
+      if (library != null && library.isScheme('file')) {
+        candidates.add(p.join(p.dirname(p.dirname(library.toFilePath())), asset));
+      }
+    } catch (_) {
+      // No package config; try next to the script instead.
+    }
+    candidates
+      ..add(p.join(p.dirname(Platform.script.toFilePath()), '..', asset))
+      ..add(p.join(Directory.current.path, asset));
+    for (final candidate in candidates) {
+      final path = p.normalize(candidate);
+      if (await File(path).exists()) return path;
+    }
+    return null;
+  }
+
+  /// Where the status bar item was clicked, to open the menu there.
+  static Map<String, int>? _positionOf(Map<String, dynamic>? args) {
+    final position = args?['position'];
+    if (position is! Map) return null;
+    final (x, y) = (position['x'], position['y']);
+    if (x is! num || y is! num) return null;
+    return {'x': x.toInt(), 'y': y.toInt()};
   }
 
   /// A file path for a `file:` URI or a plain path; `null` for none.

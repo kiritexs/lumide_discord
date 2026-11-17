@@ -2,7 +2,7 @@ name: lumide_discord
 description: >-
   Lumide IDE plugin that shows what you're working on in your Discord status:
   the file, project, language and time, with privacy settings.
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/kiritexs/lumide_discord
 issue_tracker: https://github.com/kiritexs/lumide_discord/issues
 
@@ -24,6 +24,7 @@ environment:
 
 dependencies:
   dart_discord_presence: ^1.2.2
+  glob: ^2.1.3
   lumide_api: ^1.14.0
   path: ^1.9.0
 

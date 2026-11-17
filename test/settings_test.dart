@@ -152,8 +152,20 @@ void main() {
       });
     });
 
+    test('reads the project lists, separated by ; or new lines', () {
+      final settings = PresenceSettings.fromValues(const {
+        PresenceSettings.excludedProjectsKey: ' D:\\work\\app ;; company_app\n',
+        PresenceSettings.includedProjectsKey: 'D:/oss/**',
+        PresenceSettings.hideExcludedProjectsKey: true,
+      });
+      expect(settings.excludedProjects, [r'D:\work\app', 'company_app']);
+      expect(settings.includedProjects, ['D:/oss/**']);
+      expect(settings.hideExcludedProjects, isTrue);
+      expect(PresenceSettings.fromValues(const {}).excludedProjects, isEmpty);
+    });
+
     test('lists every key once', () {
-      expect(PresenceSettings.keys.toSet(), hasLength(12));
+      expect(PresenceSettings.keys.toSet(), hasLength(15));
       expect(PresenceSettings.keys, everyElement(startsWith('discordPresence.')));
     });
   });

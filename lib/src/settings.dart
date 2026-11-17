@@ -1,6 +1,8 @@
 /// The plugin's settings (Settings → Plugins → Discord Presence).
 library;
 
+import 'projects.dart';
+
 /// A button under the Discord status that opens [url]. Others can click
 /// it; Discord doesn't let you click your own.
 typedef PresenceButton = ({String label, String url});
@@ -19,6 +21,9 @@ class PresenceSettings {
     this.privacyMode = false,
     this.showButtons = true,
     this.customButton,
+    this.excludedProjects = const [],
+    this.includedProjects = const [],
+    this.hideExcludedProjects = false,
   });
 
   /// The plugin's own Discord application ("Playing Lumide"), with the
@@ -67,6 +72,10 @@ class PresenceSettings {
       showButtons: flag(showButtonsKey, defaults.showButtons),
       customButton:
           _button(text(customButtonLabelKey), text(customButtonUrlKey)),
+      excludedProjects: splitList(text(excludedProjectsKey)),
+      includedProjects: splitList(text(includedProjectsKey)),
+      hideExcludedProjects:
+          flag(hideExcludedProjectsKey, defaults.hideExcludedProjects),
     );
   }
 
@@ -101,6 +110,9 @@ class PresenceSettings {
   static const showButtonsKey = 'discordPresence.showButtons';
   static const customButtonLabelKey = 'discordPresence.customButtonLabel';
   static const customButtonUrlKey = 'discordPresence.customButtonUrl';
+  static const excludedProjectsKey = 'discordPresence.excludedProjects';
+  static const includedProjectsKey = 'discordPresence.includedProjects';
+  static const hideExcludedProjectsKey = 'discordPresence.hideExcludedProjects';
 
   /// Every key, for reading all settings at once.
   static const keys = [
@@ -116,6 +128,9 @@ class PresenceSettings {
     showButtonsKey,
     customButtonLabelKey,
     customButtonUrlKey,
+    excludedProjectsKey,
+    includedProjectsKey,
+    hideExcludedProjectsKey,
   ];
 
   /// Whether to show anything on Discord.
@@ -152,6 +167,21 @@ class PresenceSettings {
 
   /// The user's own button, in place of [discordButton].
   final PresenceButton? customButton;
+
+  /// Projects whose names stay off Discord: folder paths, globs or project
+  /// names (see [ProjectPattern]).
+  final List<String> excludedProjects;
+
+  /// When set, only these projects show their names; all others count as
+  /// excluded.
+  final List<String> includedProjects;
+
+  /// Remove the status entirely in excluded projects, instead of showing it
+  /// without file and project names.
+  final bool hideExcludedProjects;
+
+  ProjectFilter get projectFilter =>
+      ProjectFilter(excluded: excludedProjects, included: includedProjects);
 
   /// The buttons to show: the website, then the user's own button or
   /// Lumide's Discord server.

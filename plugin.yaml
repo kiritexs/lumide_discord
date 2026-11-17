@@ -1,6 +1,6 @@
 id: lumide_discord
 name: 'Discord Presence'
-version: '0.1.0'
+version: '0.2.0'
 description: "Show what you're working on in your Discord status: file, project, language and time."
 license: 'GPL-3.0'
 entry_point: 'bin/main.dart'
@@ -27,6 +27,21 @@ configuration:
     default: false
     title: 'Privacy Mode'
     description: 'Hide file and project names, for example while screen sharing or on client work: "Editing a Dart file". The language, idle and debugging are still shown.'
+  - key: discordPresence.excludedProjects
+    type: string
+    default: ''
+    title: 'Excluded Projects'
+    description: 'Projects whose file and project names stay off Discord, separated by ";": folder paths (D:\work\company_app), globs (D:/work/**) or project names (company_app). "Hide" in the status bar menu adds the current project here.'
+  - key: discordPresence.includedProjects
+    type: string
+    default: ''
+    title: 'Included Projects'
+    description: 'When set, only these projects show their names on Discord; all others are treated as excluded. Same format as Excluded Projects.'
+  - key: discordPresence.hideExcludedProjects
+    type: boolean
+    default: false
+    title: 'Hide Excluded Projects Completely'
+    description: 'Remove your status while in an excluded project, instead of showing it without file and project names.'
   - key: discordPresence.showButtons
     type: boolean
     default: true
@@ -66,7 +81,7 @@ configuration:
     type: boolean
     default: true
     title: 'Show Elapsed Time'
-    description: 'Show how long Lumide has been open.'
+    description: 'Show how long Lumide has been open. When off, the timer stays at 0:00: Discord always shows a timer, so it can''t be removed completely.'
   - key: discordPresence.idleMinutes
     type: integer
     default: 5
@@ -80,6 +95,9 @@ configuration:
 
 contributes:
   commands:
+    - id: discordPresence.menu
+      title: 'Discord Presence: Show Menu'
+      category: 'Discord Presence'
     - id: discordPresence.toggle
       title: 'Discord Presence: Turn On/Off'
       category: 'Discord Presence'

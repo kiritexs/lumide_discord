@@ -17,7 +17,10 @@ own](#buttons).
 
 - Shows the open file, the project, the language and the time since Lumide
   was opened. Each of these can be hidden, or all names at once with
-  [privacy mode](#privacy-mode).
+  [privacy mode](#privacy-mode), or only in some projects with
+  [excluded projects](#excluded-projects).
+- A Discord icon in the status bar opens a [menu](#status-bar-menu) to
+  change all this in one click.
 - Says **Editing** once you type in a file and **Viewing** before that.
 - Shows **Running**, **Debugging** or **Testing** while you run your app
   from Run and Debug.
@@ -53,11 +56,43 @@ The second line is the project ("In my_app") and the elapsed time follows.
 
 ## Privacy mode
 
-Turn on **Privacy Mode** in the settings, or run **Discord Presence: Turn
-Privacy Mode On/Off**, to hide file and project names at once, for example
-while screen sharing or working on a client's code. Discord then shows
-"Editing a Dart file" without the project. The status bar says
-**Discord: private** while it's on.
+Turn on **Privacy Mode** in the [status bar menu](#status-bar-menu) or the
+settings, or run **Discord Presence: Turn Privacy Mode On/Off**, to hide
+file and project names in every project, for example while screen sharing.
+Discord then shows "Editing a Dart file" without the project.
+
+## Excluded projects
+
+To keep one project's names off Discord, such as your company's, open it
+and pick **Hide "project"** in the [status bar menu](#status-bar-menu). In
+that project Discord shows "Editing a Dart file" without the project, like
+privacy mode; everywhere else nothing changes. Pick **Show "project"** to
+undo it.
+
+To manage the list, pick **Excluded Projects…** in the menu:
+
+- **Add Folder…** opens the folder picker, so you can exclude any project
+  without opening it;
+- **Add Pattern…** takes a glob or a project name;
+- click an entry to remove it.
+
+The same list is the **Excluded Projects** setting, with entries separated
+by `;`. Entries can be:
+
+| Entry | Matches |
+|---|---|
+| `D:\work\company_app` | That folder and everything in it |
+| `D:/work/**` | Globs, matched against the project folder and the open file |
+| `**/*.secret.dart` | Single files anywhere |
+| `company_app` | Any project (workspace folder) with that name |
+
+Matching ignores case, and `\` and `/` are the same.
+
+**Included Projects** (also in the menu) works the other way round: when
+set, only those projects show their names, and all others count as
+excluded. Privacy mode still hides names in included projects too. Turn on
+**Hide Excluded Projects Completely** to remove your status in excluded
+projects instead of showing it without names.
 
 ## Buttons
 
@@ -79,6 +114,9 @@ them does nothing.
 |---|---|---|
 | Show on Discord | on | Turns the plugin on or off. |
 | Privacy Mode | off | Hides file and project names. |
+| Excluded Projects | (empty) | Projects whose names stay off Discord. See [Excluded projects](#excluded-projects). |
+| Included Projects | (empty) | When set, only these projects show their names. |
+| Hide Excluded Projects Completely | off | Removes your status in excluded projects. |
 | Show Buttons | on | The [buttons](#buttons) under your status. |
 | Custom Button Text | (empty) | Your own button in place of "Join Lumide Discord", up to 32 characters. |
 | Custom Button Link | (empty) | The address it opens, starting with `https://`. |
@@ -86,19 +124,31 @@ them does nothing.
 | Show File Name | on | Off shows only the language: "Editing a Dart file". |
 | Show Project Name | on | The workspace folder's name. |
 | Show Language | on | The language image and name. |
-| Show Elapsed Time | on | Time since Lumide was opened. |
+| Show Elapsed Time | on | Time since Lumide was opened. Off keeps the timer at 0:00: Discord always shows one, so it can't be removed completely. |
 | Idle After (Minutes) | 5 | Shows "Idle" after this long without typing, moving the cursor or switching files. 0 never goes idle. |
 | Hide When Idle | off | Removes your status while idle instead of showing "Idle". |
 
-## Commands and status bar
+## Status bar menu
 
-The **Discord** item in the status bar shows the connection: blue when
-your status is shown, grey while turned off, connecting or waiting for
-Discord. Click it to turn the plugin on or off.
+Hover the Discord icon in the status bar to see whether your status is
+shown, and click it for a menu with:
+
+- the connection state;
+- **Turn On / Turn Off**;
+- **Privacy Mode**;
+- **Hide "project"** or **Show "project"**, for the project you're in;
+- **Excluded Projects…** and **Included Projects…**, to add folders with
+  the folder picker, add patterns, or remove entries;
+- **Show File Name**, **Show Project Name**, **Show Language**, **Show
+  Elapsed Time** and **Show Buttons**;
+- **Reconnect**, while Discord isn't connected.
+
+## Commands
 
 | Command | |
 |---|---|
-| Discord Presence: Turn On/Off | Same as clicking the status bar item. |
+| Discord Presence: Show Menu | The [status bar menu](#status-bar-menu). |
+| Discord Presence: Turn On/Off | Turns the plugin on or off. |
 | Discord Presence: Turn Privacy Mode On/Off | See [Privacy mode](#privacy-mode). |
 | Discord Presence: Reconnect | Connects now instead of waiting for the next retry (every 20 s). |
 
@@ -157,12 +207,13 @@ Activity Privacy settings.
 
 ## Troubleshooting
 
-- **Status bar says "Discord: waiting"**: the Discord desktop app isn't
-  running, or isn't reachable. Discord in a browser doesn't work. On Linux,
-  Flatpak and Snap versions of Discord can hide the connection from other
-  apps.
-- **Nothing shows in Discord** although the status bar is blue: check
-  **Activity Privacy → Share your detected activities with others**.
+- **The icon's tooltip says "Discord isn't running"**: the Discord desktop
+  app isn't running, or isn't reachable. Discord in a browser doesn't work.
+  On Linux, Flatpak and Snap versions of Discord can hide the connection
+  from other apps.
+- **Nothing shows in Discord** although the tooltip says your activity is
+  shown: check **Activity Privacy → Share your detected activities with
+  others**.
 - **No images with your own application**: upload them under **Rich
   Presence → Art Assets** with the names in
   [Your own Discord application](#your-own-discord-application), then wait
@@ -170,7 +221,9 @@ Activity Privacy settings.
 
 ## Credits
 
-The language, idle and debugging images come from
+The status bar icon is Discord's logo from
+[Simple Icons](https://simpleicons.org) (CC0). The language, idle and
+debugging images come from
 [VSCord](https://github.com/leonardssh/vscord) (MIT License, © iCrawl).
 Dart, Flutter and the other language logos are trademarks of their owners;
 this plugin isn't affiliated with or endorsed by them.

@@ -12,6 +12,7 @@ void main() {
     bool flutterProject = false,
     bool idle = false,
     RunMode runMode = RunMode.none,
+    bool excluded = false,
   }) =>
       Activity(
         sessionStart: start,
@@ -21,6 +22,7 @@ void main() {
         flutterProject: flutterProject,
         idle: idle,
         runMode: runMode,
+        excluded: excluded,
       );
 
   group('presenceFor', () {
@@ -212,6 +214,22 @@ void main() {
     });
   });
 
+  group('excluded projects', () {
+    test('hide the file and project names, like privacy mode', () {
+      final content =
+          presenceFor(activity(editing: true, excluded: true), settings)!;
+      expect(content.details, 'Editing a Dart file');
+      expect(content.state, isNull);
+      expect(content.imageKey, 'dart');
+    });
+
+    test('show nothing when set to hide completely', () {
+      const hide = PresenceSettings(hideExcludedProjects: true);
+      expect(presenceFor(activity(excluded: true), hide), isNull);
+      expect(presenceFor(activity(), hide)!.state, 'In tilawa');
+    });
+  });
+
   group('discordPresenceOf', () {
     test('shows the image large with Lumide in the small circle', () {
       final presence = discordPresenceOf(
@@ -247,12 +265,16 @@ void main() {
       expect(discordPresenceOf(presenceFor(activity(), none)!).buttons, isNull);
     });
 
-    test('leaves out the time when hidden', () {
+    test('keeps the timer at 0:00 when hidden: a start a year ahead', () {
       const hidden = PresenceSettings(showElapsedTime: false);
+      final now = DateTime(2026, 11, 17, 18);
+      final presence =
+          discordPresenceOf(presenceFor(activity(), hidden)!, now: now);
       expect(
-        discordPresenceOf(presenceFor(activity(), hidden)!).timestamps,
-        isNull,
+        presence.timestamps?.start,
+        now.add(hiddenTimerLead).millisecondsSinceEpoch ~/ 1000,
       );
+      expect(presence.timestamps?.end, isNull);
     });
   });
 

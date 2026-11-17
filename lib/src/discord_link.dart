@@ -42,16 +42,23 @@ abstract interface class PresenceClient {
 /// there is none, as the large image.
 const lumideAsset = DiscordAsset.fromKey('lumide', text: 'Lumide');
 
+/// Discord always shows a timer: without a start time it counts from when
+/// the status last changed. A start this far ahead keeps it at 0:00, which
+/// is as close to no timer as Discord allows.
+const hiddenTimerLead = Duration(days: 365);
+
 /// [content] as Discord presence: the language (or idle or debugging) as
 /// the large image with the Lumide logo in the small circle, like the
-/// editor extensions for VS Code.
-DiscordPresence discordPresenceOf(PresenceContent content) {
-  final started = content.startedAt;
+/// editor extensions for VS Code. Without a start time, the timer stays at
+/// 0:00 (see [hiddenTimerLead]); [now] is for tests.
+DiscordPresence discordPresenceOf(PresenceContent content, {DateTime? now}) {
+  final started =
+      content.startedAt ?? (now ?? DateTime.now()).add(hiddenTimerLead);
   final image = content.imageKey;
   return DiscordPresence(
     details: content.details,
     state: content.state,
-    timestamps: started == null ? null : DiscordTimestamps.started(started),
+    timestamps: DiscordTimestamps.started(started),
     largeAsset: image == null
         ? lumideAsset
         : DiscordAsset.fromKey(image, text: content.imageText),

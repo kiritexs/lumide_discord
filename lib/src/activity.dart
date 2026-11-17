@@ -29,6 +29,7 @@ class Activity {
     this.flutterProject = false,
     this.idle = false,
     this.runMode = RunMode.none,
+    this.excluded = false,
   });
 
   /// When Lumide was opened; the elapsed time counts from here.
@@ -51,6 +52,10 @@ class Activity {
 
   /// What is running; the user isn't shown as idle while something runs.
   final RunMode runMode;
+
+  /// The project is on the exclude list (or off the include list): its
+  /// file and project names stay off Discord.
+  final bool excluded;
 }
 
 /// The texts and images of the Discord presence.
@@ -110,8 +115,9 @@ PresenceContent? presenceFor(Activity activity, PresenceSettings settings) {
   final running = activity.runMode != RunMode.none;
   final idle = activity.idle && !running;
   if (idle && settings.clearWhenIdle) return null;
+  if (activity.excluded && settings.hideExcludedProjects) return null;
 
-  final private = settings.privacyMode;
+  final private = settings.privacyMode || activity.excluded;
   final showFileName = settings.showFileName && !private;
   final showProjectName = settings.showProjectName && !private;
 
